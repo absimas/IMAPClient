@@ -105,7 +105,7 @@ public class MainFrame extends JFrame {
         menu.setMnemonic(KeyEvent.VK_F);
         menuBar.add(menu);
 
-        JMenuItem menuItem = new JMenuItem(EXIT,  KeyEvent.VK_Q);
+        JMenuItem menuItem = new JMenuItem(EXIT);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.ALT_MASK));
         menuItem.addActionListener(e -> System.exit(0));
         menu.add(menuItem);
@@ -119,19 +119,19 @@ public class MainFrame extends JFrame {
         menu.setMnemonic(KeyEvent.VK_F);
         menuBar.add(menu);
 
-        JMenuItem menuItem = new JMenuItem(FOLDERS,  KeyEvent.VK_Q);
+        JMenuItem menuItem = new JMenuItem(FOLDERS);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_1, InputEvent.ALT_MASK));
         menuItem.addActionListener(e -> showCard(Card.FOLDERS));
         menu.add(menuItem);
 
-        menuItem = new JMenuItem(WRITE_NEW,  KeyEvent.VK_Q);
+        menuItem = new JMenuItem(WRITE_NEW);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_2, InputEvent.ALT_MASK));
         menuItem.addActionListener(e -> {
             // ToDo write new mail dialog
         });
         menu.add(menuItem);
 
-        menuItem = new JMenuItem(LOGOUT,  KeyEvent.VK_Q);
+        menuItem = new JMenuItem(LOGOUT);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_3, InputEvent.ALT_MASK));
         menuItem.addActionListener(e -> {
             // ToDo logout
@@ -140,7 +140,7 @@ public class MainFrame extends JFrame {
         menu.add(menuItem);
         menu.addSeparator();
 
-        menuItem = new JMenuItem(EXIT,  KeyEvent.VK_Q);
+        menuItem = new JMenuItem(EXIT);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.ALT_MASK));
         menuItem.addActionListener(e -> System.exit(0));
         menu.add(menuItem);
