@@ -8,7 +8,13 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.util.Scanner;
 
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -47,12 +53,69 @@ public class MainFrame extends JFrame {
 
     public MainFrame() {
         super(APP_NAME);
+        try {
+            IMAP imap = new IMAP(Credentials.HOST);
+            if (imap.authenticate(Credentials.USERNAME, Credentials.PASSWORD)) {
+                imap.list();
+            } else {
+                // Auth failed
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         useAuthenticationMenu();
         customizeFrame();
         addCards();
         showCard(Card.LOGIN);
         setVisible(true);
     }
+
+
+    // Works
+//    // open SSLSocket connection to server and send login
+//    try {
+//
+//        // obtain SSLSocketFactory for creating SSLSockets
+//        SSLSocketFactory socketFactory =
+//                (SSLSocketFactory) SSLSocketFactory.getDefault();
+//
+//        // create SSLSocket from factory
+//        SSLSocket socket = (SSLSocket) socketFactory.createSocket("imap.gmail.com", 993);
+//        // create PrintWriter for sending login to server
+//        PrintWriter output = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+//        Scanner in = new Scanner(socket.getInputStream());
+//        System.out.println(in.nextLine());
+//
+//        output.println("A01 lOGIN skulltower 1z2x3c4a5s6d\r");
+//        output.flush();
+//
+//        // display response to user
+//        System.out.println(in.nextLine());
+//        System.out.println(in.nextLine());
+//
+//        output.println("A02 SELECT INBOX\r");
+//        System.out.println("before flush");
+//        output.flush();
+//        System.out.println("After Flush");
+//
+//       /*
+//        * It waits in nextLine() and it does not show anything
+//        * Because of waiting, It does not show After nextLine() message Dialog
+//        * But after 5 minutes, It shows a message dialog with null string
+//        */
+//        System.out.println(in.nextLine());
+//        System.out.println("After nextLine()");
+//
+//        // clean up streams and SSLSocket
+//        output.close();
+//        in.close();
+//        socket.close();
+//
+//    } catch (IOException e) {
+//        e.printStackTrace();
+//    }
+//    System.out.println("done");
+
 
     private void useAuthenticationMenu() {
         JMenuBar menuBar = new JMenuBar();
@@ -62,7 +125,7 @@ public class MainFrame extends JFrame {
 
         JMenuItem menuItem = new JMenuItem(EXIT,  KeyEvent.VK_Q);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_1, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> System.exit(0));
+//        menuItem.addActionListener(e -> System.exit(0));
         menu.add(menuItem);
 
         setJMenuBar(menuBar);
@@ -76,27 +139,27 @@ public class MainFrame extends JFrame {
 
         JMenuItem menuItem = new JMenuItem(FOLDERS,  KeyEvent.VK_Q);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_1, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> showCard(Card.FOLDERS));
+//        menuItem.addActionListener(e -> showCard(Card.FOLDERS));
         menu.add(menuItem);
 
         menuItem = new JMenuItem(WRITE_NEW,  KeyEvent.VK_Q);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_2, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> {
-            // ToDo write new mail dialog
-        });
+//        menuItem.addActionListener(e -> {
+//             ToDo write new mail dialog
+//        });
         menu.add(menuItem);
 
         menuItem = new JMenuItem(LOGOUT,  KeyEvent.VK_Q);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_3, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> {
-            // ToDo logout
-        });
+//        menuItem.addActionListener(e -> {
+//             ToDo logout
+//        });
         menu.add(menuItem);
         menu.addSeparator();
 
         menuItem = new JMenuItem(EXIT,  KeyEvent.VK_Q);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_4, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> System.exit(0));
+//        menuItem.addActionListener(e -> System.exit(0));
         menu.add(menuItem);
 
         setJMenuBar(menuBar);
@@ -157,7 +220,12 @@ public class MainFrame extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(MainFrame::new);
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                new MainFrame();
+            }
+        });
     }
 
 }
