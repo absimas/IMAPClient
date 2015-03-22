@@ -4,17 +4,9 @@ import java.awt.CardLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Toolkit;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.util.Scanner;
 
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -53,17 +45,7 @@ public class MainFrame extends JFrame {
 
     public MainFrame() {
         super(APP_NAME);
-        try {
-            IMAP imap = new IMAP(Credentials.HOST);
-            if (imap.authenticate(Credentials.USERNAME, Credentials.PASSWORD)) {
-                imap.list();
-            } else {
-                // Auth failed
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        useAuthenticationMenu();
+        usePreAuthFileMenu();
         customizeFrame();
         addCards();
         showCard(Card.LOGIN);
@@ -117,21 +99,21 @@ public class MainFrame extends JFrame {
 //    System.out.println("done");
 
 
-    private void useAuthenticationMenu() {
+    private void usePreAuthFileMenu() {
         JMenuBar menuBar = new JMenuBar();
         JMenu menu = new JMenu(FILE);
         menu.setMnemonic(KeyEvent.VK_F);
         menuBar.add(menu);
 
         JMenuItem menuItem = new JMenuItem(EXIT,  KeyEvent.VK_Q);
-        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_1, InputEvent.ALT_MASK));
-//        menuItem.addActionListener(e -> System.exit(0));
+        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.ALT_MASK));
+        menuItem.addActionListener(e -> System.exit(0));
         menu.add(menuItem);
 
         setJMenuBar(menuBar);
     }
 
-    private void usePostAuthenticatedMenu() {
+    void usePostAuthenticatedMenu() {
         JMenuBar menuBar = new JMenuBar();
         JMenu menu = new JMenu(FILE);
         menu.setMnemonic(KeyEvent.VK_F);
@@ -139,27 +121,28 @@ public class MainFrame extends JFrame {
 
         JMenuItem menuItem = new JMenuItem(FOLDERS,  KeyEvent.VK_Q);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_1, InputEvent.ALT_MASK));
-//        menuItem.addActionListener(e -> showCard(Card.FOLDERS));
+        menuItem.addActionListener(e -> showCard(Card.FOLDERS));
         menu.add(menuItem);
 
         menuItem = new JMenuItem(WRITE_NEW,  KeyEvent.VK_Q);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_2, InputEvent.ALT_MASK));
-//        menuItem.addActionListener(e -> {
-//             ToDo write new mail dialog
-//        });
+        menuItem.addActionListener(e -> {
+            // ToDo write new mail dialog
+        });
         menu.add(menuItem);
 
         menuItem = new JMenuItem(LOGOUT,  KeyEvent.VK_Q);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_3, InputEvent.ALT_MASK));
-//        menuItem.addActionListener(e -> {
-//             ToDo logout
-//        });
+        menuItem.addActionListener(e -> {
+            // ToDo logout
+                // change menu afterwards
+        });
         menu.add(menuItem);
         menu.addSeparator();
 
         menuItem = new JMenuItem(EXIT,  KeyEvent.VK_Q);
-        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_4, InputEvent.ALT_MASK));
-//        menuItem.addActionListener(e -> System.exit(0));
+        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.ALT_MASK));
+        menuItem.addActionListener(e -> System.exit(0));
         menu.add(menuItem);
 
         setJMenuBar(menuBar);
@@ -171,7 +154,7 @@ public class MainFrame extends JFrame {
     private void customizeFrame() {
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setUndecorated(false);
-        resizeToFitInScreen((double) 2/3);
+        resizeToFitInScreen((double) 2/5);
     }
 
     /**
@@ -200,7 +183,7 @@ public class MainFrame extends JFrame {
 
     /**
      * Display the specified card
-     * @param card The card that will be shown, <code>Card</code> enum value.
+     * @param card The card that will be shown, {@code Card} enum value.
      */
     public void showCard(Card card) {
         CardLayout cardLayout = (CardLayout) mCards.getLayout();
@@ -209,8 +192,8 @@ public class MainFrame extends JFrame {
 
     /**
      * Fetch the specified card from the Cards array (if one exists)
-     * @param card The card's, which will be returned, <code>Card</code> enum value.
-     * @return Returns the specified card or <code>null</code> if it wasn't found
+     * @param card    The card's, which will be returned, {@code Card} enum value.
+     * @return Returns the specified card or {@code null} if it wasn't found
      */
     public Component findCard(Card card) {
         for(Component c: mCards.getComponents()) {
@@ -220,12 +203,7 @@ public class MainFrame extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new MainFrame();
-            }
-        });
+        SwingUtilities.invokeLater(MainFrame::new);
     }
 
 }

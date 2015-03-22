@@ -1,16 +1,16 @@
 package com.simas;
 
-import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
 
@@ -18,14 +18,20 @@ import javax.swing.JTextField;
  * Created by Simas Abramovas on 2015 Mar 19.
  */
 
-public class LoginPanel extends BasePanel {
+public class LoginPanel extends BasePanel implements ActionListener {
 
 	private static final String USERNAME = "Username";
 	private static final String PASSWORD = "Password";
-	private static final String SERVER_IP = "Server ip";
+	private static final String HOST = "Host";
+
+	private static final String LOGIN_FAILED = "Failed to login with given credentials. " +
+			"Please try again.";
 
 	private static final int MAX_USERNAME_LENGHT = 20;
-	private static final int MAX_PASSWORD_LENGHT = 20;
+	private static final int MAX_PASS_LENGTH = 20;
+
+	private JTextField mHostField, mUserField;
+	private JPasswordField mPassField;
 
 	/**
 	 * Creates a Card and it's components
@@ -50,11 +56,12 @@ public class LoginPanel extends BasePanel {
 		gbc.fill = GridBagConstraints.NONE;
 
 		// Server IP
-		JLabel label = new JLabel(SERVER_IP);
+		JLabel label = new JLabel(HOST);
 		add(label, gbc);
 		++gbc.gridx;
-		JTextField textField = new JTextField("   .   .   .   ", 15); // ToDo force dots
-		add(textField, gbc);
+		mHostField = new JTextField(Credentials.HOST, 15); // ToDo force dots
+		mHostField.addActionListener(this);
+		add(mHostField, gbc);
 
 		// Username
 		++gbc.gridy;
@@ -62,30 +69,48 @@ public class LoginPanel extends BasePanel {
 		label = new JLabel(USERNAME);
 		add(label, gbc);
 		++gbc.gridx;
-		textField = new JTextField(null, MAX_USERNAME_LENGHT);
-		add(textField, gbc);
+		mUserField = new JTextField(Credentials.USERNAME, MAX_USERNAME_LENGHT);
+		mUserField.addActionListener(this);
+		add(mUserField, gbc);
 
-		// Username
+		// Password
 		++gbc.gridy;
 		gbc.gridx = 0;
 		label = new JLabel(PASSWORD);
 		add(label, gbc);
 		++gbc.gridx;
-		textField = new JTextField(null, MAX_PASSWORD_LENGHT);
-		add(textField, gbc);
+		mPassField = new JPasswordField(Credentials.PASSWORD, MAX_PASS_LENGTH);
+		mPassField.setEchoChar('*');
+		mPassField.addActionListener(this);
+		add(mPassField, gbc);
 
 		// Exit button
 		gbc.gridy += 2;
 		gbc.gridx += 3;
 		JButton button = new JButton(MainFrame.LOGIN);
-		button.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-
-			}
-		});
+		button.addActionListener(this);
 		add(button, gbc);
-
 	}
 
+	@Override
+	public void actionPerformed(ActionEvent e) {
+		try {
+			// ToDo validate fields
+			// ToDo progress dialog
+			// ToDo init imap elsewhere?
+			IMAP imap = new IMAP(mHostField.getText());
+			if (imap.authenticate(mUserField.getText(), mPassField.getPassword())) {
+				// Auth successful
+				// Change the menu
+				getFrame().usePostAuthenticatedMenu();
+				// Show the inbox folders
+				getFrame().showCard(MainFrame.Card.FOLDERS);
+				return;
+			}
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+		// Show error
+		JOptionPane.showMessageDialog(this, LOGIN_FAILED);
+	}
 }

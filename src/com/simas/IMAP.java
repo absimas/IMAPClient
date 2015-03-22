@@ -1,24 +1,13 @@
 package com.simas;
 
-import com.sun.istack.internal.NotNull;
-
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.security.KeyStore;
-import java.security.cert.Certificate;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManagerFactory;
 
 /**
  * Created by Simas Abramovas on 2015 Mar 19.
@@ -26,7 +15,8 @@ import javax.net.ssl.TrustManagerFactory;
 
 public class IMAP {
 
-	private static final String NEGATIVE_RESPONSE = "NO";
+	private static final String RESULT_NO = "NO";
+	private static final String RESULT_BAD = "BAD";
 	private static final int PORT = 993;
 	private SSLSocket mSocket;
 
@@ -69,8 +59,8 @@ public class IMAP {
 //		mSocket.close();
 	}
 
-	public boolean authenticate(String username, String password) {
-		final String cmd = String.format("A1 LOGIN %s %s", username, password);
+	public boolean authenticate(String username, char[] password) {
+		final String cmd = String.format("A1 LOGIN %s %s", username, String.valueOf(password));
 		return runCommand(cmd) != null;
 	}
 
@@ -105,7 +95,7 @@ public class IMAP {
 	/**
 	 * Checks the integrity of the returned command:
 	 * - Makes sure that the command numbers are equal
-	 * - Makes sure the response doesn't begin with a {@code NEGATIVE_RESPONSE} identifier
+	 * - Makes sure the response doesn't begin with a {@code RESULT_NO} identifier
 	 * @param cmd         command that was executed
 	 * @param response    the resulting command that was returned by the server
 	 * @return {@code null} if either of the given commands are invalid
@@ -123,8 +113,9 @@ public class IMAP {
 					.format("Error! Command numbers do not match: '%s' and '%s'", cmd, response));
 			return null;
 		} else */if (responseSplit.length < 2 ||
-				responseSplit[1].equalsIgnoreCase(NEGATIVE_RESPONSE)) {
-			System.out.println("Error! Received a negative return command: " + response);
+				responseSplit[1].equalsIgnoreCase(RESULT_NO) ||
+				responseSplit[1].equalsIgnoreCase(RESULT_BAD)) {
+			System.out.println("Error! Unexpected result command: " + response);
 			return null;
 		}
 
