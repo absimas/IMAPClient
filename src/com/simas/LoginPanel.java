@@ -95,16 +95,17 @@ public class LoginPanel extends BasePanel implements ActionListener {
 	@Override
 	public void actionPerformed(ActionEvent e) {
 		try {
-			// ToDo validate fields
-			// ToDo progress dialog
-			// ToDo init imap elsewhere?
-			IMAP imap = new IMAP(mHostField.getText());
-			if (imap.authenticate(mUserField.getText(), mPassField.getPassword())) {
+			IMAP imap = getFrame().imap = new IMAP(mHostField.getText());
+			if (imap.login(mUserField.getText(), mPassField.getPassword())) {
 				// Auth successful
-				// Change the menu
-				getFrame().usePostAuthenticatedMenu();
-				// Show the inbox folders
-				getFrame().showCard(MainFrame.Card.FOLDERS);
+				// Update the file menu
+				getFrame().usePostAuthenticationMenu();
+				// Fetch the top folders
+				ListPanel list = (ListPanel) getFrame().findCard(MainFrame.Card.LIST);
+				list.populateList(getFrame().imap.list(""));
+				list.setMultiSelectable(false);
+				// Show the list
+				getFrame().showCard(MainFrame.Card.LIST);
 				return;
 			}
 		} catch (Exception ex) {

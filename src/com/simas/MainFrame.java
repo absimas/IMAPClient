@@ -31,16 +31,33 @@ public class MainFrame extends JFrame {
     private static final String WRITE_NEW = "Write new";
     private static final String EXIT = "Exit";
     private static final String MAIL = "Mail";
-    private static final String FOLDER = "Folder";
+    private static final String MAILBOX = "Mailbox";
     private static final String FOLDERS = "Folders";
 
     private JPanel mCards;
+    public IMAP imap;
+
+    // ToDo \NoSelect
+    // ToDo write new mail dialog
+    // ToDo validate fields
+    // ToDo progress dialog
+    // ToDo use MULTIPLE_INTERVAL_SELECTION for multi msg deletion
+        // Selecting multiple and clicking read => Opens multiple dialogs
+        // Selecting multiple and clicking delete => Deletes multiple messages
+    // ToDo html/utf bodies
+    // ToDo onMessageClicked show dialog
+
+
+
+    // ToDo bold text = unread? maybe...
+
+    // ToDo no folder rename, delete
 
     /**
      * Cards that are used in the {@code MainFrame} are distinguished by this enum
      */
     enum Card {
-        LOGIN, FOLDERS, MESSAGES
+        LOGIN, LIST, FOLDERS, MESSAGES
     }
 
     public MainFrame() {
@@ -113,7 +130,7 @@ public class MainFrame extends JFrame {
         setJMenuBar(menuBar);
     }
 
-    void usePostAuthenticatedMenu() {
+    void usePostAuthenticationMenu() {
         JMenuBar menuBar = new JMenuBar();
         JMenu menu = new JMenu(FILE);
         menu.setMnemonic(KeyEvent.VK_F);
@@ -121,21 +138,23 @@ public class MainFrame extends JFrame {
 
         JMenuItem menuItem = new JMenuItem(FOLDERS);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_1, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> showCard(Card.FOLDERS));
+        menuItem.addActionListener(e -> {
+            ListPanel list = (ListPanel) findCard(Card.LIST);
+            list.populateList(imap.list(""));
+        });
         menu.add(menuItem);
 
         menuItem = new JMenuItem(WRITE_NEW);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_2, InputEvent.ALT_MASK));
         menuItem.addActionListener(e -> {
-            // ToDo write new mail dialog
+            // new mail dialog
         });
         menu.add(menuItem);
 
         menuItem = new JMenuItem(LOGOUT);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_3, InputEvent.ALT_MASK));
         menuItem.addActionListener(e -> {
-            // ToDo logout
-                // change menu afterwards
+            // logout + change file menu afterwards
         });
         menu.add(menuItem);
         menu.addSeparator();
@@ -176,8 +195,8 @@ public class MainFrame extends JFrame {
     private void addCards() {
         mCards = new JPanel(new CardLayout());
         mCards.add(new LoginPanel(this), Card.LOGIN.name());
-//		mCards.add(new GamePanel(this), Card.FOLDERS.name());
-//		mCards.add(new ScoresPanel(this), Card.MESSAGES.name());
+		mCards.add(new ListPanel(this), Card.LIST.name());
+//		mCards.add(new ScoresPanel(this), Card.FOLDERS.name());
         add(mCards);
     }
 

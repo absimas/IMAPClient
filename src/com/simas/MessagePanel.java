@@ -17,10 +17,6 @@ public class MessagePanel extends BasePanel {
 	private JList<String> mMessageList;
 	private ArrayList<String> mMessages = new ArrayList<String>();
 
-	// ToDo use MULTIPLE_INTERVAL_SELECTION for multi msg deletion
-	// Selecting multiple and clicking read => Opens multiple dialogs
-	// Selecting multiple and clicking delete => Deletes multiple messages
-
 	/**
 	 * Creates a Card and it's components
 	 */
@@ -48,7 +44,7 @@ public class MessagePanel extends BasePanel {
 	}
 
 	public void populateList() {
-		DefaultListModel model = new DefaultListModel();
+		DefaultListModel<String> model = new DefaultListModel<>();
 		for (String message : mMessages) {
 			model.addElement(message);
 		}

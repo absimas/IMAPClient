@@ -1,12 +1,16 @@
 package com.simas;
 
+import com.sun.xml.internal.messaging.saaj.packaging.mime.internet.MimeUtility;
+
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.Socket;
+import java.util.ArrayList;
 
-import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
 /**
@@ -15,16 +19,27 @@ import javax.net.ssl.SSLSocketFactory;
 
 public class IMAP {
 
-	private static final String RESULT_NO = "NO";
-	private static final String RESULT_BAD = "BAD";
+	private static final String RESPONSE_NO = "NO";
+	private static final String RESPONSE_BAD = "BAD";
+	private static final String COMMAND_PREFIX = "?";
+	private static final String HAS_CHILDREN_FLAG = "\\HasChildren";
+	private static final String RESPONSE_SUBJECT = "Subject: ";
 	private static final int PORT = 993;
-	private SSLSocket mSocket;
+	private final BufferedWriter mWriter;
+	private final BufferedReader mReader;
+	private String mLastPath = "";
+	private boolean mSelected;
 
 	public IMAP(String host) throws IOException {
 		SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-		mSocket = (SSLSocket) factory.createSocket(host, PORT);
-		System.out.println("S:\t" + readLineFromSocket());
-//		System.out.println(readLineFromSocket());
+		Socket socket = factory.createSocket(host, PORT);
+		mReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+		mWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+		System.out.println("S:\t" + readLine());
+
+
+		// Handshake and certificate list
+//		System.out.println(readLine());
 //		System.out.println("done");
 //
 //		mSocket.startHandshake();
@@ -55,18 +70,131 @@ public class IMAP {
 //
 //			System.out.println();
 //		}
-
-//		mSocket.close();
 	}
 
-	public boolean authenticate(String username, char[] password) {
-		final String cmd = String.format("A1 LOGIN %s %s", username, String.valueOf(password));
+	public boolean login(String username, char[] password) {
+		final String cmd = String.format("LOGIN %s %s", username, String.valueOf(password));
 		return runCommand(cmd) != null;
 	}
 
-	public String list() {
-		final String cmd = "A2 LIST \"\" \"*\"";
-		return runCommand(cmd);
+	public ArrayList<Item> list(String mailboxPath) {
+		String cmd;
+		if (mailboxPath == null || mailboxPath.isEmpty()) {
+			// Root folders
+			cmd = "LIST \"\" %";
+		} else {
+			// Sub folders or folder content
+			cmd = String.format("LIST \"%s\" *", mailboxPath);
+		}
+
+		String response = runCommand(cmd);
+		ArrayList<Item> list = new ArrayList<>();
+		if (response == null) return list;
+
+		// Split response into separate lines
+		String[] responseLines = response.split("\n");
+		for (String line : responseLines) {
+			// Parse the folder name
+			String[] lineArgs = line.split("(?<!\\\\)\"");
+			if (lineArgs.length == 0) continue;
+			String folderPath = lineArgs[lineArgs.length-1];
+			String folderName = folderPath;
+			if (mailboxPath != null && !mailboxPath.isEmpty()) {
+				folderName = folderPath.replace(mailboxPath + '/', "");
+			}
+
+			// Parse hasChildren flag
+			boolean hasChildren = false;
+			if (line.contains(HAS_CHILDREN_FLAG)) hasChildren = true;
+
+			// Add to array
+			list.add(new Mailbox(folderName, folderPath, hasChildren));
+		}
+
+		mLastPath = mailboxPath;
+		return list;
+	}
+
+	public boolean select(Mailbox mailbox) {
+		final String cmd = String.format("SELECT \"%s\"", mailbox.path);
+		String response = runCommand(cmd);
+		if (response == null) return false;
+
+		// Split response into separate lines
+		String[] responseLines = response.split("\n");
+		// Find the line containing message count
+		for (String line : responseLines) {
+			if (line.endsWith("EXISTS")) {
+				// Parse the message count and save it
+				String[] lineSplit = line.split("\\s+");
+				int count = 0;
+				try {
+					count = Integer.valueOf(lineSplit[1]);
+				} catch (NumberFormatException e) {
+					e.printStackTrace();
+				}
+
+				mailbox.messageCount = count;
+				break;
+			}
+		}
+
+		mLastPath = mailbox.path;
+		mSelected = true;
+		return true;
+	}
+
+	public boolean close() {
+		final String cmd = "CLOSE";
+		String response = runCommand(cmd);
+		if (response == null) return false;
+		mSelected = false;
+		return true;
+	}
+
+	public ArrayList<Message> fetch(String flags) {
+		final String cmd = String.format("FETCH %s", flags);
+		String response = runCommand(cmd);
+
+		return new ArrayList<>();
+	}
+
+	/**
+	 * Fetches an array of {@code Message}s whose subject (name) will be set
+	 * @param from    from id. Must be higher than 0
+	 * @param to      to id. Must be higher than {@code from}
+	 * @return array of found message subjects
+	 */
+	public ArrayList<Item> fetchMessages(int from, int to) {
+		if (from < 1 || to < from) throw new IllegalArgumentException("Incorrect range given!");
+
+		ArrayList<Item> messages = new ArrayList<>();
+		// Fetch messages in requested range
+		for (int i=from; i<=to; ++i) {
+			final String cmd = String.format("FETCH %d (BODY[HEADER.FIELDS (subject)])", i);
+			String response = runCommand(cmd);
+			if (response == null) continue;
+
+			String[] responseLines = response.split("\n");
+			for (String line : responseLines) {
+				// Find the correct response line
+				if (line.startsWith(RESPONSE_SUBJECT)) {
+					// Remove "Subject: " prefix
+					String subject = line.replace(RESPONSE_SUBJECT, "");
+					// Decode subject
+					try {
+						subject = MimeUtility.decodeText(subject);
+					} catch (UnsupportedEncodingException e) {
+						e.printStackTrace();
+					}
+					messages.add(new Message(subject));
+					// No further lines are needed
+					break;
+				}
+			}
+		}
+
+		return messages;
 	}
 
 	/**
@@ -76,16 +204,30 @@ public class IMAP {
 	 * @return null if command failed
 	 */
 	private String runCommand(final String cmd) {
-		System.out.println("C:\t" + cmd);
-		// Append \r (required on UNIX systems)
-		String command = cmd + '\r';
+		// Prepend a ? for debugging and append a \r which is required on UNIX systems
+		String command = String.format("%s %s\r", COMMAND_PREFIX, cmd);
+		System.out.println("C:\t" + command);
 		try {
 			// Invoke cmd
 			writeViaSocket(command);
 			// Read return cmd
-			String returnCmd = readLineFromSocket();
-			System.out.println("S:\t" + returnCmd);
-			return parseReturnCommand(cmd, returnCmd);
+			String line, response = "";
+			while ((line = readLine()) != null) {
+				// Log response line
+				System.out.println("S:\t" + line);
+				// End reader loop if response finished
+				if (line.startsWith(COMMAND_PREFIX)) {
+					break;
+				}
+				// Append to response string
+				response += line + '\n';
+			}
+			// Return null if command failed
+			if (isResponseValid(cmd, line)) {
+				return response;
+			} else {
+				return null;
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 			return null;
@@ -93,47 +235,83 @@ public class IMAP {
 	}
 
 	/**
-	 * Checks the integrity of the returned command:
-	 * - Makes sure that the command numbers are equal
-	 * - Makes sure the response doesn't begin with a {@code RESULT_NO} identifier
-	 * @param cmd         command that was executed
-	 * @param response    the resulting command that was returned by the server
-	 * @return {@code null} if either of the given commands are invalid
+	 * Checks the validity of the server response.
+	 * @param response    the last line of the server response
+	 * @param cmd         the command that was issued to the server
+	 * @return false if the response is {@code RESPONSE_BAD} or {@code RESPONSE_NO}. Otherwise true./
 	 */
-	private String parseReturnCommand(String cmd, String response) {
+	private boolean isResponseValid(String cmd, String response) {
 		// If either command is empty, return null
 		if (cmd == null || cmd.length() == 0 || response == null || response.length() == 0) {
-			return null;
+			return false;
 		}
-		String cmdNum = cmd.substring(0, cmd.indexOf(' '));
 		String[] responseSplit = response.split("\\s+");
 
-		/*if (responseSplit.length == 0 || !cmdNum.equals(responseSplit[0])) {
-			System.out.println(String
-					.format("Error! Command numbers do not match: '%s' and '%s'", cmd, response));
-			return null;
-		} else */if (responseSplit.length < 2 ||
-				responseSplit[1].equalsIgnoreCase(RESULT_NO) ||
-				responseSplit[1].equalsIgnoreCase(RESULT_BAD)) {
-			System.out.println("Error! Unexpected result command: " + response);
-			return null;
+		if (responseSplit.length < 2) {
+			System.out.println("Error! Response too short: " + response);
+			return false;
+		} else if (responseSplit[1].equalsIgnoreCase(RESPONSE_NO)) {
+			System.out.println("Error! Invalid response: " + response);
+			return false;
+		} else if (responseSplit[1].equalsIgnoreCase(RESPONSE_BAD)) {
+			System.out.println("Error! Badly formed request: " + response);
+			return false;
+		} else {
+			return true;
 		}
-
-		return response;
 	}
 
-	private String readLineFromSocket() throws IOException {
-//		InputStreamReader isr = ;
-		BufferedReader reader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
-		String string = reader.readLine();
-		return (string != null) ? string : null;
+	private String readLine() throws IOException {
+		return mReader.readLine();
 	}
 
 	private void writeViaSocket(String cmd) throws IOException {
-		PrintWriter writer = new PrintWriter(new OutputStreamWriter(mSocket.getOutputStream()));
-//		BufferedWriter w = new BufferedWriter
-		writer.println(cmd);
-		writer.flush();
+		mWriter.write(cmd);
+		mWriter.newLine();
+		mWriter.flush();
+	}
+
+	public boolean isSelected() {
+		return mSelected;
+	}
+
+	public String getLastPath() {
+		return mLastPath;
+	}
+
+	/* Custom holder classes */
+	public static class Item {
+
+	}
+
+	public static class Mailbox extends Item {
+		public String name, path;
+		public boolean hasChildren;
+		public int messageCount;
+
+		public Mailbox(String name, String path, boolean hasChildren) {
+			this.name = name;
+			this.path = path;
+			this.hasChildren = hasChildren;
+		}
+
+		@Override
+		public String toString() {
+			return name;
+		}
+	}
+
+	public static class Message extends Item {
+		public String subject, body, from, date;
+
+		public Message(String subject) {
+			this.subject = subject;
+		}
+
+		@Override
+		public String toString() {
+			return subject;
+		}
 	}
 
 }
