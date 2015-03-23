@@ -1,14 +1,19 @@
 package com.simas;
 
+import com.sun.istack.internal.NotNull;
+import com.sun.xml.internal.messaging.saaj.packaging.mime.MessagingException;
 import com.sun.xml.internal.messaging.saaj.packaging.mime.internet.MimeUtility;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
 import javax.net.ssl.SSLSocketFactory;
@@ -24,17 +29,20 @@ public class IMAP {
 	private static final String COMMAND_PREFIX = "?";
 	private static final String HAS_CHILDREN_FLAG = "\\HasChildren";
 	private static final String RESPONSE_SUBJECT = "Subject: ";
+	private static final String RESPONSE_FROM = "From: ";
+	private static final String RESPONSE_DATE = "Date: ";
 	private static final int PORT = 993;
 	private final BufferedWriter mWriter;
 	private final BufferedReader mReader;
+	private final Socket mSocket;
 	private String mLastPath = "";
-	private boolean mSelected;
+	private Mailbox mSelection;
 
 	public IMAP(String host) throws IOException {
 		SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-		Socket socket = factory.createSocket(host, PORT);
-		mReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-		mWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+		mSocket = factory.createSocket(host, PORT);
+		mReader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
+		mWriter = new BufferedWriter(new OutputStreamWriter(mSocket.getOutputStream()));
 		System.out.println("S:\t" + readLine());
 
 
@@ -75,6 +83,21 @@ public class IMAP {
 	public boolean login(String username, char[] password) {
 		final String cmd = String.format("LOGIN %s %s", username, String.valueOf(password));
 		return runCommand(cmd) != null;
+	}
+
+	public boolean logout() {
+		final String cmd = "LOGOUT";
+		return runCommand(cmd) != null;
+	}
+
+	public boolean exit() {
+		try {
+			mSocket.close();
+			return true;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return false;
+		}
 	}
 
 	public ArrayList<Item> list(String mailboxPath) {
@@ -140,7 +163,7 @@ public class IMAP {
 		}
 
 		mLastPath = mailbox.path;
-		mSelected = true;
+		mSelection = mailbox;
 		return true;
 	}
 
@@ -148,15 +171,67 @@ public class IMAP {
 		final String cmd = "CLOSE";
 		String response = runCommand(cmd);
 		if (response == null) return false;
-		mSelected = false;
+		mSelection = null;
 		return true;
 	}
 
-	public ArrayList<Message> fetch(String flags) {
-		final String cmd = String.format("FETCH %s", flags);
+	public Message fetchMessageContent(@NotNull Message msg) {
+		if (msg == null || msg.id < 1) {
+			throw new IllegalArgumentException("Message must be valid!");
+		}
+		// Fetch header fields (from, date)
+		String cmd = String.format("FETCH %d (BODY[HEADER.FIELDS (from date)])", msg.id);
 		String response = runCommand(cmd);
+		if (response == null) return msg;
 
-		return new ArrayList<>();
+		// Parse header fields
+		String[] responseSplit = response.split("\n");
+		for (String line : responseSplit) {
+			if (line.startsWith(RESPONSE_FROM)) {
+				msg.from = line.replace(RESPONSE_FROM, "");
+			} else if (line.startsWith(RESPONSE_DATE)) {
+				msg.date = line.replace(RESPONSE_DATE, "");
+			}
+		}
+
+		// Fetch message text
+		cmd = String.format("FETCH %d BODY[1]", msg.id);
+		response = runCommand(cmd);
+		if (response == null) return msg;
+
+		// Remove first response line
+		String text;
+		int nlIndex = response.indexOf('\n');
+		if (nlIndex == -1) {
+			System.out.println("First text line couldn't be removed");
+			return msg;
+		}
+		response = response.substring(nlIndex + 1);
+		// Remove last response line
+		nlIndex = response.lastIndexOf('\n', response.length() - 2);
+		if (nlIndex == -1) {
+			System.out.println("Last text line couldn't be removed");
+			return msg;
+		}
+		response = response.substring(0, nlIndex + 1);
+
+		// Decode quoted-printable
+		try {
+			InputStream is = new ByteArrayInputStream(response.getBytes());
+			InputStreamReader isr = new InputStreamReader(MimeUtility
+					.decode(is, "quoted-printable"));
+			BufferedReader reader = new BufferedReader(isr);
+			String line, result = "";
+			while ((line = reader.readLine()) != null) {
+				result += line + "<br>";
+			}
+			msg.text = result;
+
+		} catch (MessagingException | IOException e) {
+			e.printStackTrace();
+		}
+
+		return msg;
 	}
 
 	/**
@@ -187,7 +262,7 @@ public class IMAP {
 					} catch (UnsupportedEncodingException e) {
 						e.printStackTrace();
 					}
-					messages.add(new Message(subject));
+					messages.add(new Message(subject, i));
 					// No further lines are needed
 					break;
 				}
@@ -195,6 +270,14 @@ public class IMAP {
 		}
 
 		return messages;
+	}
+
+	public boolean delete(@NotNull Message msg) {
+		if (msg == null || msg.id < 1) {
+			throw new IllegalArgumentException("Message must be valid!");
+		}
+		String cmd = String.format("STORE %d +flags.silent (\\Seen \\Deleted)", msg.id);
+		return runCommand(cmd) != null;
 	}
 
 	/**
@@ -206,7 +289,11 @@ public class IMAP {
 	private String runCommand(final String cmd) {
 		// Prepend a ? for debugging and append a \r which is required on UNIX systems
 		String command = String.format("%s %s\r", COMMAND_PREFIX, cmd);
-		System.out.println("C:\t" + command);
+		// Log only safe commands
+		if (!command.contains("? LOGIN")) {
+			System.out.println("C:\t" + command);
+		}
+
 		try {
 			// Invoke cmd
 			writeViaSocket(command);
@@ -271,12 +358,13 @@ public class IMAP {
 		mWriter.flush();
 	}
 
-	public boolean isSelected() {
-		return mSelected;
+	public Mailbox getSelection() {
+		return mSelection;
 	}
 
 	public String getLastPath() {
-		return mLastPath;
+		// Make sure null is not returned
+		return (mLastPath == null) ? "" : mLastPath;
 	}
 
 	/* Custom holder classes */
@@ -302,10 +390,12 @@ public class IMAP {
 	}
 
 	public static class Message extends Item {
-		public String subject, body, from, date;
+		public String subject, text, from, date;
+		public int id;
 
-		public Message(String subject) {
+		public Message(String subject, int id) {
 			this.subject = subject;
+			this.id = id;
 		}
 
 		@Override

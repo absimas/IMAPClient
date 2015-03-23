@@ -4,14 +4,22 @@ import java.awt.CardLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Toolkit;
+import java.awt.Window;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.io.IOException;
 
+import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
@@ -34,24 +42,23 @@ public class MainFrame extends JFrame {
     private static final String MAILBOX = "Mailbox";
     private static final String FOLDERS = "Folders";
 
+    private JDialog mProgressDialog;
     private JPanel mCards;
     public IMAP imap;
 
-    // ToDo \NoSelect
-    // ToDo write new mail dialog
-    // ToDo validate fields
-    // ToDo progress dialog
-    // ToDo use MULTIPLE_INTERVAL_SELECTION for multi msg deletion
+    // ToDo pagination
+
+    // Maybe:
+    // use MULTIPLE_INTERVAL_SELECTION for multi msg deletion
         // Selecting multiple and clicking read => Opens multiple dialogs
         // Selecting multiple and clicking delete => Deletes multiple messages
-    // ToDo html/utf bodies
-    // ToDo onMessageClicked show dialog
-
-
-
-    // ToDo bold text = unread? maybe...
-
-    // ToDo no folder rename, delete
+    // fetch uid!!!! FETCH 1 (UID) => dafuq is uid
+    // MimeUtils.decode(subject) => doesn't easily work
+    // if multiple messages open, and one of them is deleted, others have their ids changed
+    // write new mail dialog
+    // bold text = unread
+    // folder rename, delete
+    // \NoSelect
 
     /**
      * Cards that are used in the {@code MainFrame} are distinguished by this enum
@@ -67,54 +74,24 @@ public class MainFrame extends JFrame {
         addCards();
         showCard(Card.LOGIN);
         setVisible(true);
+        initProgressDialog();
     }
 
+    private void initProgressDialog() {
+        JProgressBar progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
+        progressBar.setSize(100, 30);
 
-    // Works
-//    // open SSLSocket connection to server and send login
-//    try {
-//
-//        // obtain SSLSocketFactory for creating SSLSockets
-//        SSLSocketFactory socketFactory =
-//                (SSLSocketFactory) SSLSocketFactory.getDefault();
-//
-//        // create SSLSocket from factory
-//        SSLSocket socket = (SSLSocket) socketFactory.createSocket("imap.gmail.com", 993);
-//        // create PrintWriter for sending login to server
-//        PrintWriter output = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-//        Scanner in = new Scanner(socket.getInputStream());
-//        System.out.println(in.nextLine());
-//
-//        output.println("A01 lOGIN skulltower 1z2x3c4a5s6d\r");
-//        output.flush();
-//
-//        // display response to user
-//        System.out.println(in.nextLine());
-//        System.out.println(in.nextLine());
-//
-//        output.println("A02 SELECT INBOX\r");
-//        System.out.println("before flush");
-//        output.flush();
-//        System.out.println("After Flush");
-//
-//       /*
-//        * It waits in nextLine() and it does not show anything
-//        * Because of waiting, It does not show After nextLine() message Dialog
-//        * But after 5 minutes, It shows a message dialog with null string
-//        */
-//        System.out.println(in.nextLine());
-//        System.out.println("After nextLine()");
-//
-//        // clean up streams and SSLSocket
-//        output.close();
-//        in.close();
-//        socket.close();
-//
-//    } catch (IOException e) {
-//        e.printStackTrace();
-//    }
-//    System.out.println("done");
+        JPanel container = new JPanel();
+        container.setLayout(new BoxLayout(container, BoxLayout.X_AXIS));
+        container.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        container.add(progressBar);
 
+        mProgressDialog = new JDialog(this, "Please wait");
+        mProgressDialog.add(container);
+        mProgressDialog.pack();
+        mProgressDialog.setLocationRelativeTo(null);
+    }
 
     private void usePreAuthFileMenu() {
         JMenuBar menuBar = new JMenuBar();
@@ -124,13 +101,15 @@ public class MainFrame extends JFrame {
 
         JMenuItem menuItem = new JMenuItem(EXIT);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> System.exit(0));
+        menuItem.addActionListener(e -> new Thread(() -> {
+            System.exit(0);
+        }).start());
         menu.add(menuItem);
 
         setJMenuBar(menuBar);
     }
 
-    void usePostAuthenticationMenu() {
+    void usePostAuthMenu() {
         JMenuBar menuBar = new JMenuBar();
         JMenu menu = new JMenu(FILE);
         menu.setMnemonic(KeyEvent.VK_F);
@@ -138,30 +117,44 @@ public class MainFrame extends JFrame {
 
         JMenuItem menuItem = new JMenuItem(FOLDERS);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_1, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> {
+        menuItem.addActionListener(e -> new Thread(() -> {
+            setProgressing(true);
             ListPanel list = (ListPanel) findCard(Card.LIST);
+            // Close selected mailbox (if any)
+            if (imap.getSelection() != null) imap.close();
             list.populateList(imap.list(""));
-        });
+            setProgressing(false);
+        }).start());
         menu.add(menuItem);
 
-        menuItem = new JMenuItem(WRITE_NEW);
-        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_2, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> {
-            // new mail dialog
-        });
-        menu.add(menuItem);
+//        menuItem = new JMenuItem(WRITE_NEW);
+//        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_2, InputEvent.ALT_MASK));
+//        menuItem.addActionListener(e -> {
+//            // new mail dialog
+//        });
+//        menu.add(menuItem);
 
         menuItem = new JMenuItem(LOGOUT);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_3, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> {
-            // logout + change file menu afterwards
-        });
+        menuItem.addActionListener(e -> new Thread(() -> {
+            setProgressing(true);
+            usePreAuthFileMenu();
+            imap.logout();
+            imap.close();
+            showCard(Card.LOGIN);
+            setProgressing(false);
+        }).start());
         menu.add(menuItem);
         menu.addSeparator();
 
         menuItem = new JMenuItem(EXIT);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.ALT_MASK));
-        menuItem.addActionListener(e -> System.exit(0));
+        menuItem.addActionListener(e -> new Thread(() -> {
+            setProgressing(true);
+            imap.logout();
+            imap.close();
+            System.exit(0);
+        }).start());
         menu.add(menuItem);
 
         setJMenuBar(menuBar);
@@ -173,20 +166,21 @@ public class MainFrame extends JFrame {
     private void customizeFrame() {
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setUndecorated(false);
-        resizeToFitInScreen((double) 2/5);
+        resizeToFitInScreen(this, (double) 2/5);
     }
 
     /**
      * Resize the{@code }JFrame} to fit the screen at specified proportions.
+     * @param frame     Window that will be resized
      * @param atMost    Part of the window that can be covered at most.
      */
-    private void resizeToFitInScreen(double atMost) {
+    public static void resizeToFitInScreen(Window frame, double atMost) {
         // Check image sizes
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         double maxWidth = screenSize.getWidth() * atMost;
         double maxHeight = screenSize.getHeight() * atMost;
-        setSize((int) maxWidth, (int) maxHeight);
-        setLocationRelativeTo(null); // Center frame on the screen
+        frame.setSize((int) maxWidth, (int) maxHeight);
+        frame.setLocationRelativeTo(null); // Center frame on the screen
     }
 
     /**
@@ -219,6 +213,12 @@ public class MainFrame extends JFrame {
             if (card.name().equals(c.getName())) return c;
         }
         return null;
+    }
+
+    public void setProgressing(boolean shown) {
+        mProgressDialog.setVisible(shown);
+        // Disable window interaction when progress bar is shown
+        setEnabled(!shown);
     }
 
     public static void main(String[] args) {
