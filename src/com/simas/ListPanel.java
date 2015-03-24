@@ -1,12 +1,19 @@
 package com.simas;
 
 import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.ArrayList;
+
+import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JList;
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ListSelectionModel;
 
@@ -16,9 +23,12 @@ import javax.swing.ListSelectionModel;
 
 public class ListPanel extends BasePanel implements MouseListener {
 
-	private static final int MAX_VISIBLE_ROWS = 10;
+	private static final int MAX_VISIBLE_ROWS = 8;
+	private static final String PREV = "Previous";
+	private static final String NEXT = "Next";
 	private JList<IMAP.Item> mList;
 	private ArrayList<IMAP.Item> mItems = new ArrayList<>();
+	private JPanel mPaginationContainer;
 
 	/**
 	 * Creates a Card and it's components
@@ -32,6 +42,7 @@ public class ListPanel extends BasePanel implements MouseListener {
 	 * Initializes this card's components
 	 */
 	public void addComponents() {
+//		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 		setLayout(new BorderLayout());
 
 		//Create the list and put it in a scroll pane.
@@ -45,6 +56,47 @@ public class ListPanel extends BasePanel implements MouseListener {
 		scrollPane.setWheelScrollingEnabled(true);
 		scrollPane.createVerticalScrollBar();
 		add(scrollPane);
+
+		// Create a pagination and hide it by default
+		mPaginationContainer = new JPanel();
+		JButton prevButton = new JButton(PREV);
+		prevButton.addActionListener(e -> {
+			try {
+				IMAP.Message message = (IMAP.Message) mItems.get(0);
+				if (message.id == 1) {
+					// Already showing page 1
+					return;
+				}
+
+				int page = (int) Math.ceil((double)message.id / mList.getVisibleRowCount()) - 1;
+				int from = (page-1) * mList.getVisibleRowCount() + 1;
+				int to = Math.min(from + mList.getVisibleRowCount(),
+						getFrame().imap.getSelection().messageCount);
+				populateList(getFrame().imap.fetchMessages(from, to));
+			} catch (ClassCastException ignored) {}
+		});
+		prevButton.setSize(300, 200);
+		JButton nextButton = new JButton(NEXT);
+		nextButton.addActionListener(e -> {
+			try {
+				IMAP.Message lastMessage = (IMAP.Message) mItems.get(mItems.size()-1);
+				if (getFrame().imap.getSelection().messageCount == lastMessage.id) {
+					// No more pages
+					return;
+				}
+
+				IMAP.Message firstMessage = (IMAP.Message) mItems.get(0);
+				int from = firstMessage.id + mList.getVisibleRowCount();
+				int to = Math.min(from + mList.getVisibleRowCount(),
+						getFrame().imap.getSelection().messageCount);
+				populateList(getFrame().imap.fetchMessages(from, to));
+			} catch (ClassCastException ignored) {}
+		});
+		nextButton.setSize(300, 200);
+		mPaginationContainer.add(prevButton);
+		mPaginationContainer.add(nextButton);
+		add(mPaginationContainer, BorderLayout.PAGE_END);
+		mPaginationContainer.setVisible(false);
 	}
 
 	public void setMultiSelectable(boolean multiSelectable) {
@@ -95,7 +147,11 @@ public class ListPanel extends BasePanel implements MouseListener {
 					parent = imap.getLastPath().substring(0, lastSeparator);
 				}
 				// Close selected mailbox (if any)
-				if (imap.getSelection() != null) imap.close();
+				if (imap.getSelection() != null) {
+					imap.close();
+					// If a mailbox is selected, then there might be a pagination, remove it.
+					hidePagination();
+				}
 
 				populateList(imap.list(parent));
 				getFrame().setProgressing(false);
@@ -127,12 +183,17 @@ public class ListPanel extends BasePanel implements MouseListener {
 				if (item instanceof IMAP.Mailbox) {
 					IMAP.Mailbox mailbox = (IMAP.Mailbox) item;
 					if (mailbox.hasChildren) {
+						hidePagination();
 						// Show sub-folders
 						populateList(getFrame().imap.list(mailbox.path));
 					} else {
-						System.out.println(mailbox.path);
+						// Show messages
 						getFrame().imap.select(mailbox);
 						if (mailbox.messageCount > 0) {
+							// If messages don't fit, add a pagination
+							if (mailbox.messageCount > mList.getVisibleRowCount()) {
+								showPagination();
+							}
 							populateList(getFrame().imap.fetchMessages(1,
 									Math.min(mList.getVisibleRowCount(), mailbox.messageCount)));
 						} else {
@@ -147,9 +208,15 @@ public class ListPanel extends BasePanel implements MouseListener {
 				}
 				getFrame().setProgressing(false);
 			}).start();
-
-
 		}
+	}
+
+	private void showPagination() {
+		mPaginationContainer.setVisible(true);
+	}
+
+	void hidePagination() {
+		mPaginationContainer.setVisible(false);
 	}
 
 	@Override

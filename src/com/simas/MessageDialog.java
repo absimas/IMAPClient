@@ -102,8 +102,7 @@ class MessageDialog extends JDialog {
 		mainPane.add(panel);
 
 		// Delete button
-		panel = new JPanel();
-		panel.setLayout(new FlowLayout(FlowLayout.RIGHT, 5, 5));
+		panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
 		panel.add(deletionButton);
 		mainPane.add(panel);
 

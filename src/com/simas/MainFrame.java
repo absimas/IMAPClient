@@ -7,17 +7,14 @@ import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
-import java.io.IOException;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.KeyStroke;
@@ -45,8 +42,6 @@ public class MainFrame extends JFrame {
     private JDialog mProgressDialog;
     private JPanel mCards;
     public IMAP imap;
-
-    // ToDo pagination
 
     // Maybe:
     // use MULTIPLE_INTERVAL_SELECTION for multi msg deletion
@@ -121,7 +116,11 @@ public class MainFrame extends JFrame {
             setProgressing(true);
             ListPanel list = (ListPanel) findCard(Card.LIST);
             // Close selected mailbox (if any)
-            if (imap.getSelection() != null) imap.close();
+            if (imap.getSelection() != null) {
+                imap.close();
+                // If a mailbox is selected, then there might be a pagination, remove it.
+                list.hidePagination();
+            }
             list.populateList(imap.list(""));
             setProgressing(false);
         }).start());
@@ -174,7 +173,7 @@ public class MainFrame extends JFrame {
      * @param frame     Window that will be resized
      * @param atMost    Part of the window that can be covered at most.
      */
-    public static void resizeToFitInScreen(Window frame, double atMost) {
+    static void resizeToFitInScreen(Window frame, double atMost) {
         // Check image sizes
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         double maxWidth = screenSize.getWidth() * atMost;
@@ -198,7 +197,7 @@ public class MainFrame extends JFrame {
      * Display the specified card
      * @param card The card that will be shown, {@code Card} enum value.
      */
-    public void showCard(Card card) {
+    void showCard(Card card) {
         CardLayout cardLayout = (CardLayout) mCards.getLayout();
         cardLayout.show(mCards, card.name());
     }
@@ -208,14 +207,14 @@ public class MainFrame extends JFrame {
      * @param card    The card's, which will be returned, {@code Card} enum value.
      * @return Returns the specified card or {@code null} if it wasn't found
      */
-    public Component findCard(Card card) {
+    Component findCard(Card card) {
         for(Component c: mCards.getComponents()) {
             if (card.name().equals(c.getName())) return c;
         }
         return null;
     }
 
-    public void setProgressing(boolean shown) {
+    void setProgressing(boolean shown) {
         mProgressDialog.setVisible(shown);
         // Disable window interaction when progress bar is shown
         setEnabled(!shown);

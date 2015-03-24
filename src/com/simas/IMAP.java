@@ -203,14 +203,14 @@ public class IMAP {
 		String text;
 		int nlIndex = response.indexOf('\n');
 		if (nlIndex == -1) {
-			System.out.println("First text line couldn't be removed");
+			System.out.println("First text line couldn't be removed:\n\n" + response);
 			return msg;
 		}
 		response = response.substring(nlIndex + 1);
 		// Remove last response line
 		nlIndex = response.lastIndexOf('\n', response.length() - 2);
 		if (nlIndex == -1) {
-			System.out.println("Last text line couldn't be removed");
+			System.out.println("Last text line couldn't be removed:\n\n" + response);
 			return msg;
 		}
 		response = response.substring(0, nlIndex + 1);
@@ -241,7 +241,10 @@ public class IMAP {
 	 * @return array of found message subjects
 	 */
 	public ArrayList<Item> fetchMessages(int from, int to) {
-		if (from < 1 || to < from) throw new IllegalArgumentException("Incorrect range given!");
+		if (from < 1 || to < from) {
+			throw new IllegalArgumentException(String
+					.format("Incorrect range given: [%d,%d]", from, to));
+		}
 
 		ArrayList<Item> messages = new ArrayList<>();
 		// Fetch messages in requested range
