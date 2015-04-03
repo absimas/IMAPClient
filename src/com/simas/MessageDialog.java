@@ -111,7 +111,7 @@ class MessageDialog extends JDialog {
 		getContentPane().add(mainPane);
 
 		// Fit content, center, show
-		MainFrame.resizeToFitInScreen(this, (double) 2/5);
+		MainFrame.resizeToFitInScreen(this, (double) 2/3);
 		setLocationRelativeTo(getParent());
 		setLocation(getX() + 20, getY() + 20);
 		setVisible(true);
