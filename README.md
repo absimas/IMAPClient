@@ -4,7 +4,7 @@ University assignment for Computer Networks
 GUI program that allows browsing a mailbox.
 It allows the usage of SSL via SSLSocket java class.
 Everything was done in low level as required by the assignment.
-HTML is parsed however css styling is treated as text.
+HTML is parsed, however css styling is treated as plain text.
 
 ### Credentials.java example:
 	package com.simas;
